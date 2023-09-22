@@ -21,6 +21,7 @@ class RedirectIfAuthenticated
     {
         // $guards = empty($guards) ? [null] : $guards;
         if (Auth::attempt(['email' => $request['email'], 'password' => $request['password']])) {
+            // dd(Auth::user());
             if(Auth::user()->user_type == 'F' || Auth::user()->user_type == 'A') {
                 return redirect('/dashboard');
             } else {

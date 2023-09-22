@@ -19,6 +19,48 @@
     <link rel="stylesheet" href="/css/custom.css">
     <!-- Favicon-->
     <link rel="shortcut icon" href="/img/favicon.png">
+    <script src="/js/loader.js"></script>
+    {{-- SDK MercadoPago.js --}}
+    <script src="https://sdk.mercadopago.com/js/v2"></script>
+
+    <style>
+      .custom-loader {
+        border: 5px solid #b3b3b3;
+        border-radius: 50%;
+        border-top: 5px solid #0099ff;
+        width: 30px;
+        height: 30px;
+        -webkit-animation: spin 0.6s linear infinite;
+        animation: spin 0.6s linear infinite;
+        position: sticky;
+        bottom: 50%;
+        margin: auto;
+        display: none;
+      }
+
+      #cep-valor {
+        padding: 5px 10px;
+        text-align: center;
+      }
+
+      .frete-valor {
+        font-size: 13px;
+      }
+      .frete-tipo {
+        font-size: 13px;
+      }
+
+      /* Safari */
+      @-webkit-keyframes spin {
+        0% { -webkit-transform: rotate(0deg); }
+        100% { -webkit-transform: rotate(360deg); }
+      }
+
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    </style>
 
     <div class="modal fade" id="productView" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -94,7 +136,7 @@
               <p class="text-sm mb-4">Lorem ipsum dolor sit amet, consectetur adipiscing elit. In ut ullamcorper leo, eget euismod orci. Cum sociis natoque penatibus et magnis dis parturient montes nascetur ridiculus mus. Vestibulum ultricies aliquam convallis.</p>
               <div class="row align-items-stretch mb-4">
                 <div class="col-sm-5 pr-sm-0">
-                  <div class="border d-flex align-items-center justify-content-between py-1 px-3 bg-white border-white"><span class="small text-uppercase text-gray mr-4 no-select">Quantidade</span>
+                  <div class="border d-flex align-items-center justify-content-between py-1 px-3 bg-white border-white"><span class="small mr-4 no-select">Quantidade:</span>
                     <div class="quantity">
                       <button class="dec-btn p-0"><i class="fas fa-caret-left"></i></button>
                       <input class="form-control border-0 shadow-0 p-0" type="text" value="1">
@@ -103,6 +145,28 @@
                   </div>
                 </div>
                 <div class="col-sm-3 pl-sm-0"><a class="btn btn-dark btn-sm btn-block h-100 d-flex align-items-center justify-content-center px-0" href="cart.html">Adicionar</a></div>
+              </div>
+              <div class="row align-items-stretch mb-4">
+                <div class="col-sm-5 pr-sm-0">
+                  <div class="border d-flex align-items-center justify-content-between py-1 px-3 bg-white border-white">
+                    <div class="quantity">
+                      <label for="quantity">CEP:</label>
+                      <input class="form-control border-0 shadow-0 p-0" style="width: 100%;" placeholder="00.000-00" id="cep" name="cep" type="text" oninput="mascara(this,mcep);" maxlength="10" autocomplete="off">
+                    </div>
+                  </div>
+                </div>
+                <div class="col-sm-3 pl-sm-0">
+                  <a id="btn-calcula-frete" class="btn btn-dark btn-sm btn-block h-100 d-flex align-items-center justify-content-center px-0" href="#">Calcular</a>
+                </div>
+              </div>
+              <div class="row align-items-stretch mb-4">
+                <div class="col-sm-8 pr-sm-0">
+                  <div class="custom-loader"></div>
+                  <div id="cep-valor" class="border" style="display: none;">
+                    <span class="frete-tipo">SEDEX - chega em <strong>3 dias</strong></span> - <span class="frete-valor">Frete: <strong>R$ 25,49</strong></span><br>
+                    <span class="frete-tipo">PAC - chega em <strong>6 dias</strong></span> - <span class="frete-valor">Frete: <strong>R$ 18,30</strong></span>
+                  </div>
+                </div>
               </div>
               <ul class="list-unstyled small d-inline-block">
                 <li class="px-3 py-2 mb-1 bg-white"><strong class="text-uppercase">SKU:</strong><span class="ms-2 text-muted">{{ $product->id }}</span></li>
@@ -162,6 +226,81 @@
             </div>
           </div>
         </div>
+        <div id="wallet_container"></div>
       </section>
+      @vite(['resources/js/app.js'])
+      <script>
+        const mp = new MercadoPago('TEST-71ce55da-4762-4e63-8c73-326a0c9e580f');
+        const bricksBuilder = mp.bricks();
+
+        const delay = ms => new Promise(res => setTimeout(res, ms));
+        $('#btn-calcula-frete').on('click', async function() {
+
+          $.ajax({
+              type: "GET",
+              url: "{{ route('payment.checkout') }}",
+              success: function(result) {
+                  console.log(result);
+              }
+          });
+          return;
+
+          // mp.bricks().create("wallet", "wallet_container", {
+          //   initialization: {
+          //       preferenceId: "<PREFERENCE_ID>",
+          //   },
+          // });
+
+          // ---------------------------------
+          $('#cep-valor').css('display', 'none');
+          $('.custom-loader').css('display', 'block');
+          let cep_destino = $('#cep').val();
+          let weight = "{{ $product->weight }}";
+          weight = isNaN(weight) ? 0.5 : Number(weight);
+          if(cep_destino.length < 10) {
+            swal({
+              title: 'Atenção',
+              icon: 'warning',
+              text: 'Informe um CEP válido.'
+            });
+            return;
+          }
+          cep_destino = cep_destino.replace('.', '').replace('-', '');
+
+          await delay(2000);
+          $('.custom-loader').css('display', 'none');
+          $('#cep-valor').css('display', 'block');
+          // axios.defaults.headers.get['Content-Type'] ='application/x-www-form-urlencoded';
+          // axios.get(`https://www.cepcerto.com/ws/json-frete/38405248/${cep_destino}/${weight}`)
+          // .then(response => {
+          //   console.log(response.data);
+          // })
+          // .catch(error => {
+          //   console.log(error);
+          // });
+
+          // const request = new XMLHttpRequest()
+          // request.open('GET', `https://www.cepcerto.com/ws/xml-frete/38405248/${cep_destino}/${weight}`)
+          // request.setRequestHeader('Accept', 'jsonp');
+          // request.onload = function () {
+          //   console.log(JSON.parse(this.responseText))
+          // }
+          // request.onerror = function () {
+          //   console.log('erro ao executar a requisição')
+          // }
+          // request.send();
+
+          // $.ajax({
+          //     type: "GET",
+          //     url: `https://www.cepcerto.com/ws/xml-frete/38405248/${cep_destino}/${weight}`,
+          //     crossDomain: true,
+          //     dataType: 'jsonp',
+          //     success: function(result) {
+          //       console.log('teste');
+          //         console.log(`${result}`);
+          //     }
+          // });
+        })
+      </script>
 
 @endsection
